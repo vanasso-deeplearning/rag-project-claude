@@ -1,0 +1,33 @@
+# Backend
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+
+# Database
+sqlalchemy==2.0.23
+
+# RAG & LLM
+langchain==0.1.0
+langchain-openai==0.0.2
+openai==1.6.1
+chromadb==0.4.18
+
+# PDF Processing
+PyMuPDF==1.23.8
+pdfplumber==0.10.3
+# camelot-py[cv]==0.11.0
+
+# Excel
+pandas==2.1.4
+openpyxl==3.1.2
+
+# Image Processing
+Pillow==10.1.0
+
+# Frontend
+streamlit==1.29.0
+
+# Utilities
+requests==2.31.0
+python-magic-bin==0.4.14
