@@ -1,0 +1,21 @@
+﻿가치 유지 방식,컬럼2,설명,스테이블코인
+"RWA 담보형
+Real World Asset","법정화폐
+Fiat","o 법정화폐 1:1 연동(peg)
+o 법정화폐로 상환 보장
+o 결제(payment)로 사용 가능","o USDT
+o USDC"
+"RWA 담보형
+Real World Asset","상품∙원자재
+Commodities","o 금∙은 등 실물자산 연동
+o 실물자산에 대한 소유권 증명","o PAXG
+o XAUT
+o GPC"
+"RWA 담보형
+Real World Asset",금융상품,"o 국채, MMF(펀드) 토큰화
+o 이자, 배당 등 수익 제공
+o 토큰증권 (Security Token)","o BUIDL
+o USDY"
+알고리즘 및 하이브리드형,,"o 직접 담보가 아닌 알고리즘으로
+가격 안정화","o TerraUSD
+o USDe"

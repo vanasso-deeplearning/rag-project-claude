@@ -21,7 +21,7 @@ class QuestionRequest(BaseModel):
     question: str = Field(..., min_length=1, description="사용자 질문")
     top_k_per_knowledge: int = Field(default=3, ge=1, le=10, description="각 지식에서 검색할 문서 수")
     final_top_k: int = Field(default=5, ge=1, le=20, description="최종 사용할 문서 수")
-    model_name: str = Field(default="gpt-4o-mini", description="사용할 OpenAI 모델")
+    use_reasoning_model: bool = Field(default=False, description="True면 GPT-4 사용, False면 gpt-4o-mini")
 
 
 class QuestionResponse(BaseModel):
@@ -64,7 +64,7 @@ async def ask_question(request: QuestionRequest):
             question=request.question,
             top_k_per_knowledge=request.top_k_per_knowledge,
             final_top_k=request.final_top_k,
-            model_name=request.model_name
+            use_reasoning_model=request.use_reasoning_model
         )
         
         return QuestionResponse(**result)

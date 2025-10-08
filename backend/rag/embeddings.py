@@ -106,7 +106,8 @@ class KnowledgeEmbedder:
                     rows_text.append(row_text)
                 
                 full_text = "\n".join(rows_text)
-                
+                if description:
+                    full_text = f"[표 설명: {description}]\n\n{full_text}"
                 # 파일명에서 설명 추출
                 file_stem = csv_path.stem
                 description = file_stem.split('_')[-1] if '_' in file_stem else ""

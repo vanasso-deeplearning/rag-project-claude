@@ -218,7 +218,7 @@ def answer_question(
     question: str,
     top_k_per_knowledge: int = 3,
     final_top_k: int = 5,
-    model_name: str = "gpt-4o-mini"
+    use_reasoning_model: bool = False
 ) -> Dict[str, Any]:
     """
     RAG 전체 파이프라인: 질문 → 검색 → 답변 생성
@@ -228,7 +228,7 @@ def answer_question(
         question: 사용자 질문
         top_k_per_knowledge: 각 지식에서 검색할 문서 수
         final_top_k: 최종 사용할 문서 수
-        model_name: OpenAI 모델명
+        use_reasoning_model: True면 GPT-4, False면 gpt-4o-mini
     
     Returns:
         {
@@ -237,6 +237,12 @@ def answer_question(
             'knowledge_stats': 지식별 사용 문서 개수
         }
     """
+    if use_reasoning_model:
+        model_name = "gpt-4"
+        print("🧠 추론 모드: GPT-4 사용")
+    else:
+        model_name = "gpt-4o-mini"
+        
     # 1. 문서 검색
     documents, knowledge_stats = retrieve_documents(
         knowledge_names=knowledge_names,

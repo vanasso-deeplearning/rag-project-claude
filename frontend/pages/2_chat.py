@@ -34,7 +34,8 @@ def ask_question(
     knowledge_names: List[str],
     question: str,
     top_k_per_knowledge: int = 3,
-    final_top_k: int = 5
+    final_top_k: int = 5,
+    use_reasoning_model: bool = False
 ) -> Dict[str, Any]:
     """질문하고 답변 받기"""
     try:
@@ -45,7 +46,7 @@ def ask_question(
                 "question": question,
                 "top_k_per_knowledge": top_k_per_knowledge,
                 "final_top_k": final_top_k,
-                "model_name": "gpt-4o-mini"
+                "use_reasoning_model": use_reasoning_model
             }
         )
         response.raise_for_status()
@@ -160,18 +161,29 @@ with st.sidebar:
     top_k_per_knowledge = st.slider(
         "각 지식에서 검색할 문서 수",
         min_value=1,
-        max_value=5,
-        value=3,
+        max_value=10,
+        value=5,
         help="각 지식베이스에서 가져올 관련 문서 개수"
     )
     
     final_top_k = st.slider(
         "최종 사용할 문서 수",
         min_value=1,
-        max_value=10,
-        value=5,
+        max_value=20,
+        value=7,
         help="답변 생성에 사용할 최종 문서 개수"
     )
+
+    st.subheader("3. 모델 설정")
+    
+    use_reasoning_model = st.checkbox(
+        "🧠 추론 모드 (GPT-4)",
+        value=False,
+        help="복잡한 추론이 필요한 질문에 사용 (비용 약 20배 증가)"
+    )
+    
+    if use_reasoning_model:
+        st.warning("⚠️ GPT-4는 gpt-4o-mini보다 약 20배 비쌉니다")    
     
     st.markdown("---")
     
@@ -223,7 +235,8 @@ if question:
                     knowledge_names=selected_knowledge,
                     question=question,
                     top_k_per_knowledge=top_k_per_knowledge,
-                    final_top_k=final_top_k
+                    final_top_k=final_top_k,
+                    use_reasoning_model=use_reasoning_model
                 )
             
             if result:
