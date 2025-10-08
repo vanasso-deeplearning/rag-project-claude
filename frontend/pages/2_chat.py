@@ -64,23 +64,22 @@ def display_sources(sources: List[Dict[str, Any]]):
     st.subheader("📚 참고 출처")
     
     for source in sources:
-        with st.expander(
-            f"출처 {source['index']}: {source['knowledge_name']} - {source['source_file']}"
-        ):
-            cols = st.columns([1, 1, 2])
-            
-            with cols[0]:
-                st.write(f"**페이지:** {source['page']}")
-            
-            with cols[1]:
-                score = source.get('score', 0)
-                st.write(f"**유사도:** {score:.4f}")
-            
-            with cols[2]:
-                st.write(f"**지식:** {source['knowledge_name']}")
-            
-            st.markdown("**내용 미리보기:**")
-            st.info(source['content_preview'])
+        st.markdown(f"**출처 {source['index']}: {source['knowledge_name']} - {source['source_file']}**")
+
+        cols = st.columns([1, 1, 2])
+        
+        with cols[0]:
+            st.write(f"**페이지:** {source['page']}")
+        
+        with cols[1]:
+            score = source.get('score', 0)
+            st.write(f"**유사도:** {score:.4f}")
+        
+        with cols[2]:
+            st.write(f"**지식:** {source['knowledge_name']}")
+        
+        st.markdown("**내용 미리보기:**")
+        st.info(source['content_preview'])
 
 
 def display_knowledge_stats(stats: Dict[str, int]):
@@ -89,15 +88,31 @@ def display_knowledge_stats(stats: Dict[str, int]):
         return
     
     st.markdown("---")
-    st.subheader("📊 사용된 지식베이스")
+    st.markdown("##### 📊 사용된 지식베이스")
     
     cols = st.columns(len(stats))
     for i, (knowledge_name, count) in enumerate(stats.items()):
         with cols[i]:
-            st.metric(
-                label=knowledge_name,
-                value=f"{count}개 문서"
-            )
+            st.markdown(f"""
+                <div style="
+                    padding: 12px;
+                    background: #f0fdf4;
+                    border: 1px solid #bbf7d0;
+                    border-radius: 8px;
+                    text-align: center;
+                ">
+                    <div style="
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: #15803d;
+                        margin-bottom: 4px;
+                    ">{knowledge_name}</div>
+                    <div style="
+                        font-size: 14px;
+                        color: #16a34a;
+                    ">{count}개 문서</div>
+                </div>
+            """, unsafe_allow_html=True)
 
 
 # 메인 UI
@@ -145,7 +160,7 @@ with st.sidebar:
     top_k_per_knowledge = st.slider(
         "각 지식에서 검색할 문서 수",
         min_value=1,
-        max_value=10,
+        max_value=5,
         value=3,
         help="각 지식베이스에서 가져올 관련 문서 개수"
     )
@@ -153,7 +168,7 @@ with st.sidebar:
     final_top_k = st.slider(
         "최종 사용할 문서 수",
         min_value=1,
-        max_value=20,
+        max_value=10,
         value=5,
         help="답변 생성에 사용할 최종 문서 개수"
     )

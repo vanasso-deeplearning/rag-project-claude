@@ -132,59 +132,173 @@ class KnowledgeEmbedder:
     
     def create_embeddings(self, force_recreate: bool = False) -> Dict:
         """
-        전체 문서를 임베딩하여 ChromaDB에 저장
+        문서를 임베딩하여 ChromaDB에 저장
         
         Args:
-            force_recreate: True면 기존 DB 삭제 후 재생성
+            force_recreate: True면 전체 재임베딩, False면 증분 임베딩(기본)
             
         Returns:
             임베딩 결과 정보
         """
-        # 기존 DB 삭제
-        if force_recreate and self.chroma_dir.exists():
-            import shutil
-            shutil.rmtree(self.chroma_dir)
-            self.chroma_dir.mkdir(parents=True, exist_ok=True)
-            print("기존 ChromaDB 삭제 완료")
+        # === 전체 재임베딩 모드 ===
+        if force_recreate:
+            print("\n=== 전체 재임베딩 모드 ===")
+            
+            # 기존 DB 삭제
+            if self.chroma_dir.exists():
+                import shutil
+                shutil.rmtree(self.chroma_dir)
+                self.chroma_dir.mkdir(parents=True, exist_ok=True)
+                print("✓ 기존 ChromaDB 삭제 완료")
+            
+            # 문서 로드
+            print(f"\n=== {self.knowledge_name} 문서 로드 중 ===")
+            pdf_docs = self.load_pdf_documents()
+            csv_docs = self.load_csv_documents()
+            all_documents = pdf_docs + csv_docs
+            
+            if not all_documents:
+                raise ValueError("로드된 문서가 없습니다")
+            
+            print(f"\n총 {len(all_documents)}개 문서 로드 완료 (PDF: {len(pdf_docs)}, CSV: {len(csv_docs)})")
+            
+            # 문서 청크 분할
+            print("\n=== 문서 청크 분할 중 ===")
+            chunks = self.text_splitter.split_documents(all_documents)
+            print(f"총 {len(chunks)}개 청크 생성")
+            
+            # ChromaDB에 임베딩 저장
+            print("\n=== ChromaDB 임베딩 중 ===")
+            vectorstore = Chroma.from_documents(
+                documents=chunks,
+                embedding=self.embeddings,
+                persist_directory=str(self.chroma_dir),
+                collection_name=self.collection_name
+            )
+            
+            print(f"✓ 전체 임베딩 완료: {len(chunks)}개 청크가 ChromaDB에 저장됨")
+            
+            return {
+                "status": "success",
+                "mode": "full",
+                "knowledge_name": self.knowledge_name,
+                "total_documents": len(all_documents),
+                "pdf_count": len(pdf_docs),
+                "csv_count": len(csv_docs),
+                "total_chunks": len(chunks),
+                "new_chunks": len(chunks),
+                "chroma_path": str(self.chroma_dir)
+            }
         
-        # 문서 로드
-        print(f"\n=== {self.knowledge_name} 문서 로드 중 ===")
-        pdf_docs = self.load_pdf_documents()
-        csv_docs = self.load_csv_documents()
-        all_documents = pdf_docs + csv_docs
-        
-        if not all_documents:
-            raise ValueError("로드된 문서가 없습니다")
-        
-        print(f"\n총 {len(all_documents)}개 문서 로드 완료 (PDF: {len(pdf_docs)}, CSV: {len(csv_docs)})")
-        
-        # 문서 청크 분할
-        print("\n=== 문서 청크 분할 중 ===")
-        chunks = self.text_splitter.split_documents(all_documents)
-        print(f"총 {len(chunks)}개 청크 생성")
-        
-        # ChromaDB에 임베딩 저장
-        print("\n=== ChromaDB 임베딩 중 ===")
-        print(f"DEBUG: collection_name = '{self.collection_name}'")  # 추가
-        print(f"DEBUG: knowledge_name = '{self.knowledge_name}'")  # 추가
-        vectorstore = Chroma.from_documents(
-            documents=chunks,
-            embedding=self.embeddings,
-            persist_directory=str(self.chroma_dir),
-            collection_name=self.collection_name
-        )
-        
-        print(f"✓ 임베딩 완료: {len(chunks)}개 청크가 ChromaDB에 저장됨")
-        
-        return {
-            "status": "success",
-            "knowledge_name": self.knowledge_name,
-            "total_documents": len(all_documents),
-            "pdf_count": len(pdf_docs),
-            "csv_count": len(csv_docs),
-            "total_chunks": len(chunks),
-            "chroma_path": str(self.chroma_dir)
-        }
+        # === 증분 임베딩 모드 ===
+        else:
+            print("\n=== 증분 임베딩 모드 (새 파일만 추가) ===")
+            
+            # 기존 임베딩된 파일 목록 가져오기
+            existing_sources = set()
+            if self.chroma_dir.exists() and list(self.chroma_dir.glob("*")):
+                try:
+                    vectorstore = Chroma(
+                        persist_directory=str(self.chroma_dir),
+                        embedding_function=self.embeddings,
+                        collection_name=self.collection_name
+                    )
+                    
+                    # 기존 문서의 source 메타데이터 수집
+                    collection = vectorstore._collection
+                    all_data = collection.get()
+                    
+                    if all_data and 'metadatas' in all_data:
+                        for metadata in all_data['metadatas']:
+                            if metadata and 'source' in metadata:
+                                existing_sources.add(metadata['source'])
+                    
+                    print(f"✓ 기존 임베딩 파일: {len(existing_sources)}개")
+                    if existing_sources:
+                        print(f"  파일 목록: {', '.join(sorted(existing_sources))}")
+                    
+                except Exception as e:
+                    print(f"⚠ 기존 파일 확인 중 오류 (전체 임베딩으로 진행): {str(e)}")
+                    existing_sources = set()
+            else:
+                print("✓ 첫 임베딩입니다")
+            
+            # 모든 문서 로드
+            print(f"\n=== {self.knowledge_name} 문서 로드 중 ===")
+            pdf_docs = self.load_pdf_documents()
+            csv_docs = self.load_csv_documents()
+            all_documents = pdf_docs + csv_docs
+            
+            if not all_documents:
+                raise ValueError("로드된 문서가 없습니다")
+            
+            print(f"\n총 {len(all_documents)}개 문서 로드 완료 (PDF: {len(pdf_docs)}, CSV: {len(csv_docs)})")
+            
+            # 새 파일만 필터링
+            new_documents = []
+            for doc in all_documents:
+                source = doc.metadata.get('source', '')
+                if source not in existing_sources:
+                    new_documents.append(doc)
+            
+            # 새 파일이 없으면 종료
+            if not new_documents:
+                print("\n✓ 새 문서 없음. 임베딩 건너뜀.")
+                return {
+                    "status": "success",
+                    "mode": "incremental",
+                    "knowledge_name": self.knowledge_name,
+                    "total_documents": len(all_documents),
+                    "pdf_count": len(pdf_docs),
+                    "csv_count": len(csv_docs),
+                    "total_chunks": 0,
+                    "new_chunks": 0,
+                    "message": "새 문서 없음",
+                    "chroma_path": str(self.chroma_dir)
+                }
+            
+            print(f"\n✓ 새 문서 발견: {len(new_documents)}개")
+            new_sources = [doc.metadata.get('source') for doc in new_documents]
+            print(f"  파일 목록: {', '.join(new_sources)}")
+            
+            # 새 문서 청크 분할
+            print("\n=== 새 문서 청크 분할 중 ===")
+            new_chunks = self.text_splitter.split_documents(new_documents)
+            print(f"총 {len(new_chunks)}개 청크 생성")
+            
+            # 기존 vectorstore에 추가
+            print("\n=== ChromaDB에 추가 중 ===")
+            if not self.chroma_dir.exists() or not list(self.chroma_dir.glob("*")):
+                # 첫 임베딩
+                vectorstore = Chroma.from_documents(
+                    documents=new_chunks,
+                    embedding=self.embeddings,
+                    persist_directory=str(self.chroma_dir),
+                    collection_name=self.collection_name
+                )
+            else:
+                # 기존에 추가
+                vectorstore = Chroma(
+                    persist_directory=str(self.chroma_dir),
+                    embedding_function=self.embeddings,
+                    collection_name=self.collection_name
+                )
+                vectorstore.add_documents(new_chunks)
+            
+            print(f"✓ 증분 임베딩 완료: {len(new_chunks)}개 청크 추가됨")
+            
+            return {
+                "status": "success",
+                "mode": "incremental",
+                "knowledge_name": self.knowledge_name,
+                "total_documents": len(all_documents),
+                "pdf_count": len(pdf_docs),
+                "csv_count": len(csv_docs),
+                "total_chunks": len(existing_sources) + len(new_chunks),  # 대략적인 추정
+                "new_chunks": len(new_chunks),
+                "new_files": new_sources,
+                "chroma_path": str(self.chroma_dir)
+            }
     
     def get_retriever(self, search_kwargs: dict = None):
         """

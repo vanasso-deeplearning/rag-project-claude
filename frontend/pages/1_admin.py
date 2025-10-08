@@ -20,10 +20,28 @@ st.set_page_config(
 # 사이드바 메뉴
 with st.sidebar:
     st.header("관리자 메뉴")
-    menu = st.radio(
+    
+    # 세션 상태 초기화
+    if 'current_menu' not in st.session_state:
+        st.session_state['current_menu'] = "신규 지식 등록"
+    
+    # radio 버튼이 세션 상태를 따라가도록
+    menu_options = ["신규 지식 등록", "등록된 지식 관리"]
+    current_index = menu_options.index(st.session_state['current_menu'])
+    
+    selected_menu = st.radio(
         "메뉴 선택",
-        ["신규 지식 등록", "등록된 지식 관리"]
+        menu_options,
+        index=current_index
+        # key='menu_selection'
     )
+
+    # 사용자가 radio를 직접 변경했을 때만 세션 상태 업데이트
+    if selected_menu != st.session_state['current_menu']:
+        st.session_state['current_menu'] = selected_menu
+        st.rerun()
+    
+    menu = st.session_state['current_menu']
 
 # ========================================
 # 신규 지식 등록
@@ -98,7 +116,7 @@ if menu == "신규 지식 등록":
                 st.warning("간략 소개를 입력하세요")
     
     if not st.session_state['current_knowledge']:
-        st.warning("⬆️ 먼저 지식명을 등록하세요")
+        st.warning("먼저 지식명을 등록하세요")
         st.stop()
     
     current_knowledge = st.session_state['current_knowledge']
@@ -524,7 +542,6 @@ if menu == "신규 지식 등록":
                 
                 if st.session_state.get('confirm_embedding'):
                     st.warning("해당 지식의 PDF 등록이 완료되셨나요?")
-                    st.caption("임베딩은 Phase 3에서 구현됩니다")
                     
                     col_confirm1, col_confirm2 = st.columns(2)
                     with col_confirm1:
@@ -543,15 +560,26 @@ if menu == "신규 지식 등록":
                                     
                                     if response.status_code == 200:
                                         result = response.json()
-                                        st.success(f"✅ 임베딩 완료!")
+                                        mode = result.get('mode', 'unknown')
+                                        new_chunks = result.get('new_chunks', 0)
+                                        
+                                        if mode == 'incremental' and new_chunks == 0:
+                                            st.info("새 문서가 없습니다. 임베딩을 건너뛰었습니다.")
+                                        else:
+                                            mode_text = "전체 재임베딩" if mode == "full" else "증분 임베딩"
+                                            st.success(f"{mode_text} 완료!")
+                                        
                                         st.write(f"- 총 문서: {result['total_documents']}개")
                                         st.write(f"- PDF: {result['pdf_count']}개")
                                         st.write(f"- CSV: {result['csv_count']}개")
-                                        st.write(f"- 청크: {result['total_chunks']}개")
+                                        st.write(f"- 청크: {result.get('total_chunks', 0)}개")
+                                        if new_chunks > 0:
+                                            st.write(f"- 새로 추가된 청크: {new_chunks}개")
                                     else:
                                         st.error(f"임베딩 실패: {response.text}")
                                 except Exception as e:
                                     st.error(f"임베딩 중 오류: {str(e)}")
+                    with col_confirm2:
                         if st.button("취소", use_container_width=True):
                             st.session_state['confirm_embedding'] = False
                             st.rerun()
@@ -560,9 +588,6 @@ if menu == "신규 지식 등록":
     except:
         st.error("파일 목록 조회 실패")
 
-# ========================================
-# 등록된 지식 관리
-# ========================================
 # ========================================
 # 등록된 지식 관리
 # ========================================
@@ -596,7 +621,7 @@ elif menu == "등록된 지식 관리":
                         st.markdown("---")
                         
                         # 파일 목록 보기
-                        if st.button(f"📄 파일 목록 보기", key=f"view_{knowledge['name']}"):
+                        if st.button(f"파일 목록 보기", key=f"view_{knowledge['name']}"):
                             files_response = requests.get(
                                 f"{API_BASE_URL}/api/admin/list-files/{knowledge['name']}"
                             )
@@ -612,13 +637,27 @@ elif menu == "등록된 지식 관리":
                                 for csv in files_data['csvs']:
                                     st.write(f"  - {csv['filename']}")
                         
+                        st.markdown("---")
+                        
+                        # 임베딩 옵션
+                        st.markdown("**임베딩 옵션:**")
+                        force_recreate = st.checkbox(
+                            "전체 재임베딩 (체크 안 함: 새 파일만 추가)",
+                            value=False,
+                            key=f"force_{knowledge['name']}",
+                            help="체크: 모든 파일 다시 임베딩 (느림, 비용 증가) / 체크 안 함: 새 파일만 추가 (빠름, 저렴)"
+                        )
+                        
+                        st.markdown("---")
+                        
                         # 버튼들
                         col_btn1, col_btn2, col_btn3 = st.columns(3)
                         
                         with col_btn1:
                             if st.button(f"PDF 추가", key=f"add_{knowledge['name']}", use_container_width=True):
                                 st.session_state['current_knowledge'] = knowledge['name']
-                                st.info("왼쪽 메뉴에서 '신규 지식 등록'을 선택하세요")
+                                st.session_state['current_menu'] = "신규 지식 등록"
+                                st.rerun()
                         
                         with col_btn2:
                             if st.button(f"임베딩 시작", key=f"embed_{knowledge['name']}", use_container_width=True, type="primary"):
@@ -628,15 +667,25 @@ elif menu == "등록된 지식 관리":
                                             f"{API_BASE_URL}/api/admin/start-embedding",
                                             params={
                                                 "knowledge_name": knowledge['name'],
-                                                "force_recreate": False
+                                                "force_recreate": force_recreate
                                             }
                                         )
                                         
                                         if embed_response.status_code == 200:
                                             result = embed_response.json()
-                                            st.success("임베딩 완료")
+                                            mode = result.get('mode', 'unknown')
+                                            new_chunks = result.get('new_chunks', 0)
+                                            
+                                            if mode == 'incremental' and new_chunks == 0:
+                                                st.info("새 문서가 없습니다.")
+                                            else:
+                                                mode_text = "전체 재임베딩" if mode == "full" else "증분 임베딩"
+                                                st.success(f"{mode_text} 완료")
+                                            
                                             st.write(f"총 문서: {result['total_documents']}개")
-                                            st.write(f"청크: {result['total_chunks']}개")
+                                            st.write(f"청크: {result.get('total_chunks', 0)}개")
+                                            if new_chunks > 0:
+                                                st.write(f"새로 추가된 청크: {new_chunks}개")
                                         else:
                                             st.error(f"임베딩 실패: {embed_response.text}")
                                     except Exception as e:
@@ -647,5 +696,7 @@ elif menu == "등록된 지식 관리":
                                 st.warning("지식 삭제 기능은 Phase 2에서 구현 예정")
             else:
                 st.info("등록된 지식이 없습니다.")
-    except:
-        st.error("지식 목록 조회 실패")
+    except Exception as e:
+        st.error(f"오류 발생: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())

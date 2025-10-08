@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import json
 
-from backend.rag.qa import answer_question
+from rag.qa import answer_question
 
 router = APIRouter()
 
